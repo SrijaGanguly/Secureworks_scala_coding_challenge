@@ -1,0 +1,81 @@
+## About the challenge --
+This challenge aims to write a program in Scala that downloads the dataset at ftp://ita.ee.lbl.gov/traces/NASA_access_log_Jul95.gz and uses Apache Spark to determine the top-n most frequent visitors and urls for each day of the trace.
+Please see Usage to run the jar section below for running the project.
+
+### Technology used ----
+1) Scala 2.12.8
+2) Spark-core 2.4.0
+3) Spark-sql 2.4.0
+4) Scalatest 2.12
+5) Java 1.8.0_231
+6) sbt 1.4.7 to build package
+7) Docker version 20.10.2
+8) Mac OS 10.15.7
+9) Intellij IDEA 2020.1
+
+### The design ----
+The pipeline has a method that effectively downloads the gz file from the url, converts it into dataframe with meaningful columns and dropping some irrelevant data. The design had to change to statically use the downloaded file because docker container wouldn't effectively converse with ftp server.
+After the transformation, top "n" visitors are found for each day mentioned in the gz file. User can provide option of whether they want the most recent data or the least recent data.
+Please check documentation of each method to use the pipeline.
+Please note that the pipeline accepts 2 optional command line arguments to take the value of how many top visitors to display and the boolean value if most recent data should be displayed first.
+By default if no arguments are provided, most recent first data for the topmost visitor and url will be displayed in the file.
+The condition is to either provide both args or none at all, in which case the default values will be in effect.
+The JAR file resides in target/scala_2.12/Secureworks_scala_coding_challenge-assembly-0.1.jar in the code repository
+
+### Usage----
+Spark-submit can be used to run the jar in this case. Since the jar takes 2 optional arguments (number of visitors to display and most recent data needed or not), we may provide both the arguments or none at all.
+If you prefer to just view sample results, csv files will be found in /src/main/resources/visitors_count_* in the local project structure
+#### Example usage if running from a terminal with jar placed in <location> (Please ensure you have apache-spark installed in the system with SPARK_HOME variable set.):
+```
+spark-submit --class find_visitors_pipeline --master local <location>/Secureworks_scala_coding_challenge-assembly-0.1.jar "7" "N"
+
+OR
+
+spark-submit --class find_visitors_pipeline --master local <location>/Secureworks_scala_coding_challenge-assembly-0.1.jar
+```
+After the run, please find the csv file in ../visitor_count_* where a simple timestamp in ddmmyyyy_hhMM form is appended to directory. The gz file will also have been downloaded in the parent directory ../NASA_access_log_Jul95.gz
+
+#### Example usage if running from docker (please note the 2 input arguments on the same line as docker run - num of visitors and recent data check. Encouraged to provide both or neither):
+1) Run image
+```
+docker pull srijausingdocker/coding_challenge_scla
+docker run srijausingdocker/coding_challenge_scla "4" "y"
+
+```
+2) Copy container
+Retreieve the docker container id form teh command here and copy the id
+
+```
+docker ps --all
+```
+3) View file
+The following command helps view the csv files from the docker container:
+```
+docker diff <CONTAINER_ID>
+```
+Please take a note and copy the full path of the file or files of the form /project/visitor_count_ddmmyyyy_hhMM/part-*.csv
+
+4) Copy file
+Then the follwing command helps access those files in the local directory as docker_output.csv which you can open with local editor.
+
+```
+docker cp <CONTAINER_ID>:<full path to csv file in docker container> docker_output.csv
+
+```
+After the run, please find the csv file in /project/visitor_count_* within the docker container, where a simple timestamp in ddmmyyyy_hhMM form is appended to directory.
+The gz file will also have been downloaded in the /project/NASA_access_log_Jul95.gz directory.
+
+### The technical data flow ----
+1) Data is downloaded using method download_file() which takes an url as a parameter. It is stored under root directory.
+2) The downloaded data is passed as an input onto method apply_custom_schema() in teh form of dataframe
+3) The output of previous method is the transformed dataframe which can be further used to calculate the top visitors using method find_top_visitors(). This method takes the value "n" and whether user wants recent or least recent data.
+4) The result of frequent visitors in the previous method is written as a csv using method write_dataframe(). It is stored under /main/resources/output/visitor_count_* directory with readable timestamps in the form ddmmyyyy_HHmm
+
+
+### Assumptions ------
+1) The file downloaded remains same in structure and order of elements.
+2) User can provide input of how many visitors to be displayed each day and whether data should be sorted in an order.
+3) null dates are valid data and displayed as "NO DATE" in the csv file generated.
+4) The directory where end result is stored has write access.
+5) spark session ran is local.
+
